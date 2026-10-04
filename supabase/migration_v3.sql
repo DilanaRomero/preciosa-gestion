@@ -48,7 +48,10 @@ begin
   if p_unit_cost < 0 then raise exception 'El costo no puede ser negativo'; end if;
   if p_stock_qty < 0 then raise exception 'La existencia no puede ser negativa'; end if;
 
-  v_code := public.make_ingredient_code();
+  loop
+    v_code := public.make_ingredient_code();
+    exit when not exists (select 1 from public.ingredients where code = v_code);
+  end loop;
 
   insert into public.ingredients(code, name, unit_cost, stock_qty)
   values (v_code, trim(p_name), round(p_unit_cost,2), p_stock_qty)
@@ -203,7 +206,10 @@ begin
   from jsonb_array_elements(p_components) v_component
   where i.id = (v_component->>'ingredient_id')::uuid;
 
-  v_code := public.make_product_unit_code();
+  loop
+    v_code := public.make_product_unit_code();
+    exit when not exists (select 1 from public.product_units where code = v_code);
+  end loop;
 
   insert into public.product_units(product_id, code, description, status)
   values (v_product_id, v_code, trim(p_description), 'available')
@@ -258,68 +264,3 @@ begin
   for v_component in
     select pc.quantity, i.unit_cost, i.stock_qty, i.name
     from public.product_components pc
-    join public.ingredients i on i.id=pc.ingredient_id
-    where pc.product_id=p_product_id
-    for update of i
-  loop
-    if v_component.quantity <> floor(v_component.quantity) then
-      raise exception 'Las cantidades deben ser enteros';
-    end if;
-    if v_component.stock_qty < v_component.quantity::integer then
-      raise exception 'Stock insuficiente de %', v_component.name;
-    end if;
-    v_cost := v_cost + (v_component.unit_cost * v_component.quantity);
-  end loop;
-
-  if not exists(select 1 from public.product_components where product_id=p_product_id) then
-    raise exception 'El producto no tiene componentes';
-  end if;
-
-  update public.ingredients i
-  set stock_qty=i.stock_qty-pc.quantity::integer
-  from public.product_components pc
-  where pc.product_id=p_product_id and pc.ingredient_id=i.id;
-
-  update public.products
-  set cost=round(v_cost,2), sale_price=round(v_cost*multiplier,2)
-  where id=p_product_id;
-
-  v_code := public.make_product_unit_code();
-
-  insert into public.product_units(product_id,code,status)
-  values(p_product_id,v_code,'available')
-  returning id into v_unit_id;
-
-  insert into public.audit_log(actor_id,entity_type,entity_id,action,details)
-  values(auth.uid(),'product_unit',v_unit_id::text,'assembled',
-         jsonb_build_object('product_id',p_product_id,'code',v_code,'cost',round(v_cost,2)));
-
-  return v_code;
-end;
-$$;
-
-grant execute on function public.assemble_product_unit(uuid) to authenticated;
-
-drop view if exists public.order_item_details;
-create or replace view public.order_item_details
-with (security_invoker=true)
-as
-select
-  oi.id as order_item_id,
-  oi.order_id,
-  oi.unit_price,
-  oi.product_unit_id,
-  pu.code as unit_code,
-  pu.description as unit_description,
-  p.id as product_id,
-  p.name as product_name,
-  p.cost as product_cost,
-  o.order_number,
-  o.order_date,
-  o.customer_id,
-  o.fulfillment_status
-from public.order_items oi
-join public.orders o on o.id=oi.order_id
-join public.product_units pu on pu.id=oi.product_unit_id
-join public.products p on p.id=oi.product_id;
-
