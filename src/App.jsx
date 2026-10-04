@@ -21,9 +21,92 @@ function Panel({title,subtitle,children}){return <div className="panel"><div cla
 function Dashboard(){const[stats,setStats]=useState({customers:0,units:0,reserved:0,revenue:0});useEffect(()=>{(async()=>{const[a,b,c,d]=await Promise.all([supabase.from('customers').select('*',{count:'exact',head:true}),supabase.from('product_units').select('*',{count:'exact',head:true}),supabase.from('product_units').select('*',{count:'exact',head:true}).eq('status','reserved'),supabase.from('order_balances').select('paid_amount')]);setStats({customers:a.count||0,units:b.count||0,reserved:c.count||0,revenue:(d.data||[]).reduce((x,r)=>x+Number(r.paid_amount||0),0)})})()},[]);return <><div className="hero"><div><span className="eyebrow">CONTROL CENTRAL</span><h2>Tu negocio, claro y ordenado.</h2><p>Inventario, lives, clientes, pagos y entregas en un solo lugar.</p></div><div className="hero-orb">✦</div></div><div className="stats-grid"><Stat label="Clientes" value={stats.customers} caption="perfiles registrados"/><Stat label="Unidades" value={stats.units} caption="productos terminados"/><Stat label="Reservadas" value={stats.reserved} caption="pendientes de entrega"/><Stat label="Ventas con pago" value={money(stats.revenue)} caption="según pedidos"/></div><Panel title="Flujo del negocio" subtitle="La operación queda registrada paso a paso"><div className="steps">{[['01','Armar','Joya + empaque → costo y precio'],['02','Live','“mío” → reserva individual'],['03','Cobrar','Abonos parciales → deuda real'],['04','Entregar','Agrupa compras → salida física']].map(x=><div className="step" key={x[0]}><span>{x[0]}</span><div><b>{x[1]}</b><small>{x[2]}</small></div></div>)}</div></Panel></>}
 function Stat({label,value,caption}){return <div className="stat-card"><span>{label}</span><strong>{value}</strong><small>{caption}</small></div>}
 
-function Inventory(){const[products,setProducts]=useState([]),[units,setUnits]=useState([]),[tab,setTab]=useState('units'),[name,setName]=useState(''),[cost,setCost]=useState(''),[code,setCode]=useState(''),[pid,setPid]=useState(''),[msg,setMsg]=useState('');const load=async()=>{const[a,b]=await Promise.all([supabase.from('products').select('*').order('name'),supabase.from('product_units').select('id,code,status,product:products(name,cost,sale_price)').order('created_at',{ascending:false})]);setProducts(a.data||[]);setUnits(b.data||[])};useEffect(()=>{load()},[]);const product=async e=>{e.preventDefault();const c=Number(cost);const{error}=await supabase.from('products').insert({name,cost:c,multiplier:1.5,sale_price:Number((c*1.5).toFixed(2))});setMsg(error?.message||'Producto creado');if(!error){setName('');setCost('');load()}};const unit=async e=>{e.preventDefault();const{data,error}=await supabase.rpc('assemble_product_unit',{p_product_id:pid,p_unit_code:code.toUpperCase()});setMsg(error?.message||`Unidad armada: ${data}`);if(!error){setCode('');setPid('');load()}};return <><div className="toolbar"><p className="muted">Productos, unidades físicas y códigos únicos.</p><div className="tabs"><button className={tab==='units'?'tab active':'tab'} onClick={()=>setTab('units')}>Unidades</button><button className={tab==='products'?'tab active':'tab'} onClick={()=>setTab('products')}>Productos</button></div></div>{msg&&<div className="notice">{msg}</div>}{tab==='units'?<div className="two-col"><Panel title="Unidades terminadas" subtitle="Cada pieza física tiene un código"><div className="table-wrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Venta</th><th>Estado</th></tr></thead><tbody>{units.map(u=><tr key={u.id}><td><b>{u.code}</b></td><td>{u.product?.name}</td><td>{money(u.product?.sale_price)}</td><td><span className={'pill '+u.status}>{u.status}</span></td></tr>)}{!units.length&&<tr><td colSpan="4" className="empty">Aún no hay unidades.</td></tr>}</tbody></table></div></Panel><Panel title="Armar unidad" subtitle="Consume automáticamente la receta"><form className="stack-form" onSubmit={unit}><label>Producto<select required value={pid} onChange={e=>setPid(e.target.value)}><option value="">Selecciona…</option>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Código único<input required value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="JOY-0001"/></label><button className="primary">Armar unidad</button></form></Panel></div>:<div className="two-col"><Panel title="Productos" subtitle="Costo y precio sugerido"><div className="cards-list">{products.map(p=><div className="list-card" key={p.id}><div><b>{p.name}</b><small>Costo {money(p.cost)}</small></div><strong>{money(p.sale_price)}</strong></div>)}</div></Panel><Panel title="Crear producto"><form className="stack-form" onSubmit={product}><label>Nombre<input required value={name} onChange={e=>setName(e.target.value)}/></label><label>Costo<input type="number" min="0" step=".01" required value={cost} onChange={e=>setCost(e.target.value)}/></label><button className="primary">Guardar producto</button></form></Panel></div>}</>}
+function Inventory(){
+  const [tab,setTab]=useState('units');
+  const [ingredients,setIngredients]=useState([]);
+  const [units,setUnits]=useState([]);
+  const [productCount,setProductCount]=useState(0);
+  const [newIngredient,setNewIngredient]=useState({name:'',cost:'',stock:''});
+  const [description,setDescription]=useState('');
+  const [components,setComponents]=useState([{ingredient_id:'',quantity:1},{ingredient_id:'',quantity:1},{ingredient_id:'',quantity:1}]);
+  const [msg,setMsg]=useState('');
+  const [busy,setBusy]=useState(false);
 
-function Customers(){const[rows,setRows]=useState([]),[username,setUsername]=useState(''),[name,setName]=useState(''),[msg,setMsg]=useState('');const load=async()=>{const{data}=await supabase.from('customers').select('*').order('created_at',{ascending:false});setRows(data||[])};useEffect(()=>{load()},[]);const add=async e=>{e.preventDefault();const{error}=await supabase.from('customers').insert({tiktok_username:username.replace('@',''),full_name:name||null});setMsg(error?.message||'Cliente guardado');if(!error){setUsername('');setName('');load()}};return <div className="two-col"><Panel title="Clientes" subtitle="Identificados principalmente por TikTok"><div className="table-wrap"><table><thead><tr><th>TikTok</th><th>Nombre</th><th>WhatsApp</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td>@{r.tiktok_username}</td><td>{r.full_name||'—'}</td><td>{r.phone||'—'}</td></tr>)}{!rows.length&&<tr><td colSpan="3" className="empty">Aún no hay clientes.</td></tr>}</tbody></table></div></Panel><Panel title="Registrar cliente" subtitle="Puedes empezar solo con TikTok">{msg&&<div className="notice">{msg}</div>}<form className="stack-form" onSubmit={add}><label>Usuario de TikTok<input required value={username} onChange={e=>setUsername(e.target.value)} placeholder="@cliente"/></label><label>Nombre completo<input value={name} onChange={e=>setName(e.target.value)}/></label><button className="primary">Guardar cliente</button></form></Panel></div>}
+  const load=async()=>{
+    const [{data:i},{data:u},{count:pCount}]=await Promise.all([
+      supabase.from('ingredients').select('id,code,name,unit_cost,stock_qty,active').eq('active',true).order('name'),
+      supabase.from('product_units').select('id,code,description,status,created_at,product:products(name,cost,sale_price)').order('created_at',{ascending:false}),
+      supabase.from('products').select('id',{count:'exact',head:true})
+    ]);
+    setIngredients(i||[]); setUnits(u||[]); setProductCount(pCount||0);
+  };
+  useEffect(()=>{load()},[]);
+
+  const addIngredient=async e=>{
+    e.preventDefault(); setBusy(true); setMsg('');
+    const {error}=await supabase.rpc('create_ingredient',{p_name:newIngredient.name,p_unit_cost:Number(newIngredient.cost),p_stock_qty:Number(newIngredient.stock)});
+    setBusy(false); setMsg(error?error.message:'Producto suelto guardado. Su código se generó automáticamente.');
+    if(!error){setNewIngredient({name:'',cost:'',stock:''});load()}
+  };
+
+  const pick=(index,value)=>setComponents(prev=>prev.map((c,i)=>i===index?{...c,ingredient_id:value}:c));
+  const setQty=(index,value)=>setComponents(prev=>prev.map((c,i)=>i===index?{...c,quantity:Number(value)||0}:c));
+  const selectedComponents=components.filter(c=>c.ingredient_id);
+  const computedCost=selectedComponents.reduce((sum,c)=>{const item=ingredients.find(i=>i.id===c.ingredient_id);return sum+(item?Number(item.unit_cost)*Number(c.quantity||0):0)},0);
+  const computedSale=computedCost*1.5;
+
+  const assemble=async e=>{
+    e.preventDefault(); setBusy(true); setMsg('');
+    if(selectedComponents.length<2){setBusy(false);setMsg('Selecciona al menos 2 productos que formen la unidad.');return}
+    const ids=selectedComponents.map(c=>c.ingredient_id);
+    if(new Set(ids).size!==ids.length){setBusy(false);setMsg('No repitas el mismo producto dentro de una unidad.');return}
+    const {data,error}=await supabase.rpc('assemble_unit_from_components',{p_description:description.trim(),p_components:selectedComponents,p_multiplier:1.5});
+    setBusy(false); setMsg(error?error.message:`Unidad ${data} armada correctamente. El código se generó solo.`);
+    if(!error){setDescription('');setComponents([{ingredient_id:'',quantity:1},{ingredient_id:'',quantity:1},{ingredient_id:'',quantity:1}]);load()}
+  };
+
+  return <>
+    <div className="toolbar">
+      <div><p className="muted">Registra productos sueltos y arma unidades con 2 o 3 componentes.</p></div>
+      <div className="tabs"><button className={tab==='units'?'tab active':'tab'} onClick={()=>setTab('units')}>Unidades terminadas</button><button className={tab==='components'?'tab active':'tab'} onClick={()=>setTab('components')}>Productos sueltos</button></div>
+    </div>
+    {msg&&<div className="notice">{msg}</div>}
+
+    {tab==='components' ? <div className="two-col">
+      <Panel title="Productos sueltos" subtitle="Collares, cajas y cualquier componente que entre al inventario">
+        <div className="table-wrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Costo</th><th>Existencia</th></tr></thead>
+        <tbody>{ingredients.map(i=><tr key={i.id}><td><b>{i.code}</b></td><td>{i.name}</td><td>{money(i.unit_cost)}</td><td>{i.stock_qty}</td></tr>)}{!ingredients.length&&<tr><td colSpan="4" className="empty">No hay productos sueltos todavía.</td></tr>}</tbody></table></div>
+      </Panel>
+      <Panel title="Agregar producto suelto" subtitle="El código se genera automáticamente">
+        <form className="stack-form" onSubmit={addIngredient}>
+          <label>Nombre<input required value={newIngredient.name} onChange={e=>setNewIngredient({...newIngredient,name:e.target.value})} placeholder="Caja corazón"/></label>
+          <label>Costo unitario<input type="number" min="0" step="0.01" required value={newIngredient.cost} onChange={e=>setNewIngredient({...newIngredient,cost:e.target.value})} placeholder="10"/></label>
+          <label>Existencia inicial<input type="number" min="0" step="1" required value={newIngredient.stock} onChange={e=>setNewIngredient({...newIngredient,stock:e.target.value})} placeholder="10"/></label>
+          <button className="primary" disabled={busy}>{busy?'Guardando…':'Guardar producto suelto'}</button>
+        </form>
+      </Panel>
+    </div> :
+    <div className="two-col">
+      <Panel title="Unidades terminadas" subtitle={`${units.length} unidades físicas · ${productCount} combinaciones`}>
+        <div className="table-wrap"><table><thead><tr><th>Código</th><th>Descripción</th><th>Composición</th><th>Costo</th><th>Venta</th><th>Estado</th></tr></thead>
+        <tbody>{units.map(u=><tr key={u.id}><td><b>{u.code}</b></td><td>{u.description}</td><td>{u.product?.name}</td><td>{money(u.product?.cost)}</td><td>{money(u.product?.sale_price)}</td><td><span className={'pill '+u.status}>{u.status}</span></td></tr>)}{!units.length&&<tr><td colSpan="6" className="empty">Todavía no armaste ninguna unidad.</td></tr>}</tbody></table></div>
+      </Panel>
+      <Panel title="Armar una unidad" subtitle="Selecciona 2 o 3 productos sueltos. El código NO lo escribes.">
+        <form className="stack-form" onSubmit={assemble}>
+          <label>Descripción de la unidad<textarea required value={description} onChange={e=>setDescription(e.target.value)} placeholder="Collar de tulipán con caja corazón" rows="3"/></label>
+          {[0,1,2].map((idx)=> <div className="component-row" key={idx}>
+            <div className="component-index">{idx+1}</div>
+            <label>Producto {idx+1}<select required={idx<2} value={components[idx].ingredient_id} onChange={e=>pick(idx,e.target.value)}><option value="">{idx===2?'(opcional)':'Selecciona…'}</option>{ingredients.map(i=><option key={i.id} value={i.id}>{i.name} · {money(i.unit_cost)} · stock {i.stock_qty}</option>)}</select></label>
+            <label>Cant.<input type="number" min="1" step="1" value={components[idx].quantity} onChange={e=>setQty(idx,e.target.value)}/></label>
+          </div>)}
+          <div className="price-preview"><div><span>Costo de la unidad</span><b>{money(computedCost)}</b></div><div><span>Precio sugerido ×1,5</span><b>{money(computedSale)}</b></div></div>
+          <div className="selected-hint">El sistema descuenta los componentes del inventario y genera un código como <b>JOY-000001</b>.</div>
+          <button className="primary" disabled={busy}>{busy?'Armando…':'Armar unidad y generar código'}</button>
+        </form>
+      </Panel>
+    </div>}
+  </>
+}
 
 function Live(){const[customers,setCustomers]=useState([]),[units,setUnits]=useState([]),[cid,setCid]=useState(''),[code,setCode]=useState(''),[price,setPrice]=useState(''),[msg,setMsg]=useState('');const load=async()=>{const[c,u]=await Promise.all([supabase.from('customers').select('id,tiktok_username,full_name').order('tiktok_username'),supabase.from('product_units').select('id,code,status,product:products(name,sale_price)').eq('status','available').order('code')]);setCustomers(c.data||[]);setUnits(u.data||[])};useEffect(()=>{load()},[]);useEffect(()=>{const u=units.find(x=>x.code===code.toUpperCase());if(u)setPrice(u.product?.sale_price||'')},[code,units]);const reserve=async e=>{e.preventDefault();const{data,error}=await supabase.rpc('reserve_product_unit',{p_unit_code:code.toUpperCase(),p_customer_id:cid,p_price:Number(price)});setMsg(error?.message||`Reserva registrada: ${data}`);if(!error){setCode('');setPrice('');load()}};return <div className="two-col"><Panel title="“MÍO” EN EL LIVE" subtitle="Reserva una pieza individual">{msg&&<div className="notice">{msg}</div>}<form className="stack-form" onSubmit={reserve}><label>Cliente<select required value={cid} onChange={e=>setCid(e.target.value)}><option value="">Selecciona…</option>{customers.map(c=><option key={c.id} value={c.id}>@{c.tiktok_username}</option>)}</select></label><label>Código de joya<input required value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="JOY-0001"/></label><label>Precio anunciado<input type="number" min="0" step=".01" required value={price} onChange={e=>setPrice(e.target.value)}/></label><button className="primary">REGISTRAR MÍO</button></form></Panel><Panel title="Disponibles" subtitle="Unidades listas para vender"><div className="cards-list">{units.map(u=><div className="list-card" key={u.id}><div><b>{u.code}</b><small>{u.product?.name}</small></div><strong>{money(u.product?.sale_price)}</strong></div>)}</div></Panel></div>}
 
