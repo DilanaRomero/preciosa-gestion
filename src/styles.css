@@ -16,3 +16,23 @@ nav{display:grid;gap:5px}.nav-item{display:flex;align-items:center;gap:11px;widt
 .toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.tabs{display:flex;gap:6px}.tab{border:1px solid #e4dce8;background:#fff;border-radius:10px;padding:8px 12px;color:#756979}.tab.active{background:#efe4f5;color:#65417d;border-color:#d8c4e4}.two-col{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.85fr);gap:18px}.stack-form{display:grid;gap:13px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;padding:12px 8px;border-bottom:1px solid #f0ebf2;white-space:nowrap}th{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#988b9b}.empty{text-align:center;padding:30px;color:#978c9a}.pill{font-size:10px;border-radius:99px;padding:5px 8px;background:#f0edf1}.pill.available{background:#eaf5ee;color:#3e7250}.pill.reserved{background:#f9eedf;color:#946028}.cards-list{display:grid;gap:8px}.list-card{display:flex;align-items:center;justify-content:space-between;padding:12px 13px;border:1px solid #eee7f1;border-radius:13px}.list-card b,.list-card small{display:block}.list-card small{color:#887b8d;font-size:11px;margin-top:2px}.small-btn{border:1px solid #d9c8e2;background:#faf7fc;color:#65417d;border-radius:9px;padding:7px 9px;font-size:11px}
 @media(max-width:900px){.app-shell{grid-template-columns:1fr}.sidebar{position:static;height:auto;padding:14px}.sidebar nav{display:flex;overflow:auto}.nav-item{width:auto;flex:0 0 auto}.user-mini{display:none}.main-content{min-width:0}.topbar,.page-wrap{padding-left:18px;padding-right:18px}.stats-grid{grid-template-columns:repeat(2,1fr)}.two-col,.steps{grid-template-columns:1fr}}
 @media(max-width:560px){.hero{padding:22px}.hero h2{font-size:26px}.hero-orb{display:none}.stats-grid{grid-template-columns:1fr 1fr}.topbar{align-items:flex-start}.today{display:none}.topbar h1{font-size:28px}.page-wrap{padding-bottom:20px}}
+textarea{width:100%;padding:12px 13px;border:1px solid #e3dce7;border-radius:12px;background:#fff;outline:none;resize:vertical}
+textarea:focus{border-color:#a17ac0;box-shadow:0 0 0 3px rgba(161,122,192,.12)}
+.component-row{display:grid;grid-template-columns:28px minmax(0,1fr) 82px;gap:9px;align-items:end}
+.component-row .component-index{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#efe4f5;color:#6f4d91;font-weight:700;font-size:12px;margin-bottom:8px}
+.price-preview{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:2px}
+.price-preview>div{padding:12px;border:1px solid #eee7f1;border-radius:13px;background:#faf7fb}
+.price-preview span,.selected-hint{display:block;color:#847888;font-size:11px}
+.price-preview b{display:block;font-size:20px;margin-top:4px}
+.selected-hint{padding:10px 12px;border-radius:12px;background:#f6eefb;color:#65417d}
+.click-row{cursor:pointer}.click-row:hover{background:#faf7fb}
+.customer-summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.customer-summary span{padding:10px 13px;border:1px solid #eee7f1;border-radius:12px;background:#faf7fb;color:#776a7b;font-size:11px}
+.customer-summary b{display:block;color:#2c2330;font-size:15px;margin-top:3px}
+.order-detail{border:1px solid #eee7f1;border-radius:15px;padding:14px;margin:10px 0;background:#fff}
+.order-head{display:flex;justify-content:space-between;gap:16px;padding-bottom:9px;border-bottom:1px solid #f0ebf2}
+.order-head>div:last-child{text-align:right}.order-head b,.order-head span{display:block}.order-head span{font-size:11px;color:#877b89;margin-top:3px}
+.order-items{display:grid;gap:7px;margin-top:9px}.order-item{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;border-radius:11px;background:#faf7fb}
+.order-item b,.order-item small{display:block}.order-item small{font-size:10px;color:#877b89;margin-top:3px}
+.debt{color:#a54a4a!important}
+@media(max-width:560px){.component-row{grid-template-columns:25px minmax(0,1fr) 70px}.price-preview{grid-template-columns:1fr}.order-head{align-items:flex-start}}
